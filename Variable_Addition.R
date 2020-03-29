@@ -622,12 +622,128 @@ season2018 = right_join(season2018, season2018type)
 
 alldata = full_join(season2010, season2011) %>% full_join(season2012) %>% full_join(season2013) %>% full_join(season2014) %>% full_join(season2015) %>% full_join(season2016) %>% full_join(season2017) %>% full_join(season2018)
 
-conference = filter(alldata, game_type == 2)
-out_conference = filter(alldata, game_type == 3)
-division = filter(alldata, game_type == 1)
+alldata$date_time=as.Date(alldata$date_time)
+alldata = arrange(alldata, team_id, date_time) %>% filter(play_num == 3)
+
+gamesinweek.func = function(data){
+  y = rep(NA, nrow(data))
+  z = rep(NA, nrow(data))
+  for(i in 2:nrow(data)){
+    if(data$season[i] == data$season[i-1] & data$team_id[i] == data$team_id[i-1]){
+      y[i] = data$date_time[i] - data$date_time[i-1]
+      h = i - 1
+      startdate = data$date_time[i] - 7
+      count = 0
+      while(h > 0){
+        if(data$date_time[h] >= startdate & data$team_id[h]==data$team_id[i]){
+          count = count + 1
+          h = h - 1
+        } else {
+          h = h-1
+        }
+      }
+      z[i] = count
+    }
+  }
+  list = list(y, z)
+  list
+  return(list)
+}
+list = gamesinweek.func(alldata)
+rest = list[[1]]
+giw = list[[2]]
+alldata$rest_days= rest
+alldata$game_in_week = giw
+
+winstreak5.func = function(data){
+  y = rep(NA, nrow(data))
+  for(i in 6:nrow(data)){
+    if(data$season[i] == data$season[i-5] & data$team_id[i] == data$team_id[i-5]){
+      h = 5
+      count = 0
+      while(h > 0){
+        if(data$won[i-h] == "TRUE"){
+          count = count + 1
+          h= h-1
+        }else{
+          h = h-1
+        }
+      }
+      y[i] = count
+    }
+  }
+  return(factor(y))
+}
+
+winstreak10.func = function(data){
+  y = rep(NA, nrow(data))
+  for(i in 11:nrow(data)){
+    if(data$season[i] == data$season[i-10] & data$team_id[i] == data$team_id[i-10]){
+      h = 10
+      count = 0
+      while(h > 0){
+        if(data$won[i-h] == "TRUE"){
+          count = count + 1
+          h= h-1
+        }else{
+          h = h-1
+        }
+      }
+      y[i] = count
+    }
+  }
+  return(factor(y))
+}
+
+winstreak20.func = function(data){
+  y = rep(NA, nrow(data))
+  for(i in 21:nrow(data)){
+    if(data$season[i] == data$season[i-20] & data$team_id[i] == data$team_id[i-20]){
+      h = 20
+      count = 0
+      while(h > 0){
+        if(data$won[i-h] == "TRUE"){
+          count = count + 1
+          h= h-1
+        }else{
+          h = h-1
+        }
+      }
+      y[i] = count
+    }
+  }
+  return(factor(y))
+}
+alldata$last5 = winstreak5.func(alldata)
+alldata$last10 = winstreak10.func(alldata)
+alldata$last20 =winstreak20.func(alldata)
+
+winpercent.func = function(data){
+  y = rep(NA, nrow(data))
+  wins = 0
+  gamenum = 0
+  for(i in 2:nrow(data)){
+    if(data$won[i-1]=="TRUE" & data$season[i] == data$season[i-1]& data$team_id[i]==data$team_id[i-1]){
+      wins = wins + 1
+      gamenum = gamenum + 1
+    }else if(data$won[i-1]=="FALSE"& data$season[i] == data$season[i-1]& data$team_id[i]==data$team_id[i-1]){
+      gamenum = gamenum + 1
+    } else{
+      wins = 0
+      gamenum = 0
+    }
+    if(gamenum == 0){
+      y[i] = 0
+    }
+    y[i] = (wins/gamenum)*100
+  }
+  return(factor(y))
+}
+
+alldata$win_percent = winpercent.func(alldata)
 
 #Select the Variables that are useful before the game begins
-slim_data = select(alldata, game_id, team_id, HoA, season, away_team_id, home_team_id, goals, shots, hits, pim, powerPlayOpportunities, powerPlayGoals, faceOffWinPercentage, giveaways, takeaways, shortName, teamName, game_number, first_goal_win, scored_first, home_conference, home_division, away_conference, away_division, game_type, play_num)
+slim_data = select(alldata, game_id, team_id, date_time, HoA, season, away_team_id, home_team_id, goals, shots, hits, pim, powerPlayOpportunities, powerPlayGoals, faceOffWinPercentage, giveaways, takeaways, shortName, teamName, game_number, first_goal_win, scored_first, home_conference, home_division, away_conference, away_division, game_type, play_num, rest_days, game_in_week, last5, last10, last20, win_percent)
 
 #Make shortName and teamName be one variable (team)
 slim_data$team = paste(slim_data$shortName, slim_data$teamName)
@@ -646,15 +762,15 @@ for(i in 1:nrow(test1)){
   if(test1$Type[i] == "team_id.x"){
     test1$Type[i] = "Away"
   }else{
-    test1$Type[i] = "Home"
+    test1$Type[i] = "Home" 
   }
 }
 
-cleaned = select(test1, game_id, Type, Team, season.x, away_team_id.x, home_team_id.x, goals.x, shots.x, hits.x, pim.x, powerPlayOpportunities.x, powerPlayGoals.x, faceOffWinPercentage.x, giveaways.x, takeaways.x, game_number.x, first_goal_win.x, scored_first.x, home_conference.x, home_division.x, away_conference.x, away_division.x, game_type.x, team.x, goals.y, shots.y, hits.y, pim.y, powerPlayOpportunities.y, powerPlayGoals.y, faceOffWinPercentage.y, giveaways.y, takeaways.y, scored_first.y, team.y)
+cleaned = select(test1, game_id, Type, Team, season.x, away_team_id.x, home_team_id.x, goals.x, shots.x, hits.x, pim.x, powerPlayOpportunities.x, powerPlayGoals.x, faceOffWinPercentage.x, giveaways.x, takeaways.x, game_number.x, first_goal_win.x, scored_first.x, home_conference.x, home_division.x, away_conference.x, away_division.x, game_type.x, team.x, goals.y, shots.y, hits.y, pim.y, powerPlayOpportunities.y, powerPlayGoals.y, faceOffWinPercentage.y, giveaways.y, takeaways.y, scored_first.y, team.y, rest_days.x, game_in_week.x, last5.x, last10.x, last20.x, win_percent.x, rest_days.y, game_in_week.y, last5.y, last10.y, last20.y, win_percent.y)
 
 cleaned=cleaned[with(cleaned, order(Team, game_id)),]
 
-colnames(cleaned) = c("game_id", "Type", "team_ID", "Season", "away_team_id", "home_team_id", "away_goals", "away_shots", "away_hits", "away_pim", "away_powerPlayOpportunities", "away_powerPlayGoals", "away_faceOffWinPercentage", "away_giveaways", "away_takeaways", "game_number", "first_goal_win", "away_scored_first", "home_conference", "home_division", "away_conference", "away_division", "game_type", "away_team_name", "home_goals", "home_shots", "home_hits", "home_pim", "home_powerPlayOpportunities", "home_powerPlayGoals", "home_faceOffWinPercentage", "home_giveaways", "home_takeaways", "home_scored_first", "home_team_name")
+colnames(cleaned) = c("game_id", "Type", "team_id", "Season", "away_team_id", "home_team_id", "away_goals", "away_shots", "away_hits", "away_pim", "away_powerPlayOpportunities", "away_powerPlayGoals", "away_faceOffWinPercentage", "away_giveaways", "away_takeaways", "game_number", "first_goal_win", "away_scored_first", "home_conference", "home_division", "away_conference", "away_division", "game_type", "away_team_name", "home_goals", "home_shots", "home_hits", "home_pim", "home_powerPlayOpportunities", "home_powerPlayGoals", "home_faceOffWinPercentage", "home_giveaways", "home_takeaways", "home_scored_first", "home_team_name", "away_rest", "away_game_in_week", "away_last5_win", "away_last10_win", "away_last20_win", "away_win_percent", "home_rest", "home_game_in_week", "home_last5_win", "home_last10_win", "home_last20_win", "home_win_percent")
 
 #create varaibles that make running averages of hits, goals, etc for past 1,5,10,20 games
 avgSeason.func = function(data, var1, var2){
@@ -662,10 +778,10 @@ avgSeason.func = function(data, var1, var2){
   teamscore = 0
   gamenum = 0
   for(i in 2:nrow(data)){
-    if(data$Type[i-1] == "Home" & data$Season[i] == data$Season[i-1]){
+    if(data$Type[i-1] == "Home" & data$Season[i] == data$Season[i-1]& data$team_id[i]==data$team_id[i-1]){
       teamscore = teamscore + var2[i-1]
       gamenum = gamenum + 1
-    }else if(data$Type[i-1] != "Home"& data$Season[i] == data$Season[i-1]){
+    }else if(data$Type[i-1] != "Home"& data$Season[i] == data$Season[i-1]& data$team_id[i]==data$team_id[i-1]){
       teamscore = teamscore + var1[i-1]
       gamenum = gamenum + 1
     } else{
@@ -702,7 +818,7 @@ last5avg.func = function(data, var1, var2){
   y = rep(NA, nrow(data))
   avg = 0
   for(i in 6:nrow(data)){
-    if(data$Type[i-5] == "Away" & data$Season[i] == data$Season[i-5]){
+    if(data$Type[i-5] == "Away" & data$Season[i] == data$Season[i-5]& data$team_id[i]==data$team_id[i-5]){
       avg = avg + var1[i-5]
       j = 4
       while(j > 0){
@@ -716,7 +832,7 @@ last5avg.func = function(data, var1, var2){
       avg = avg/5
       y[i] = avg
       avg = 0
-    } else if(data$Type[i-5] != "Away" & data$Season[i] == data$Season[i-5]){
+    } else if(data$Type[i-5] != "Away" & data$Season[i] == data$Season[i-5]& data$team_id[i]==data$team_id[i-5]){
       avg = avg + var2[i-5]
       j = 4
       while(j > 0){
@@ -757,7 +873,7 @@ last10avg.func = function(data, var1, var2){
   y = rep(NA, nrow(data))
   avg = 0
   for(i in 11:nrow(data)){
-    if(data$Type[i-10] == "Away" & data$Season[i] == data$Season[i-10]){
+    if(data$Type[i-10] == "Away" & data$Season[i] == data$Season[i-10]& data$team_id[i]==data$team_id[i-10]){
       avg = avg + var1[i-10]
       j = 9
       while(j > 0){
@@ -771,7 +887,7 @@ last10avg.func = function(data, var1, var2){
       avg = avg/10
       y[i] = avg
       avg = 0
-    } else if(data$Type[i-10] != "Away" & data$Season[i] == data$Season[i-10]){
+    } else if(data$Type[i-10] != "Away" & data$Season[i] == data$Season[i-10]& data$team_id[i]==data$team_id[i-10]){
       avg = avg + var2[i-10]
       j = 9
       while(j > 0){
@@ -794,7 +910,7 @@ last20avg.func = function(data, var1, var2){
   y = rep(NA, nrow(data))
   avg = 0
   for(i in 21:nrow(data)){
-    if(data$Type[i-20] == "Away" & data$Season[i] == data$Season[i-20]){
+    if(data$Type[i-20] == "Away" & data$Season[i] == data$Season[i-20] & data$team_id[i]==data$team_id[i-20]){
       avg = avg + var1[i-20]
       j = 19
       while(j > 0){
@@ -808,7 +924,7 @@ last20avg.func = function(data, var1, var2){
       avg = avg/20
       y[i] = avg
       avg = 0
-    } else if(data$Type[i-20] != "Away" & data$Season[i] == data$Season[i-20]){
+    } else if(data$Type[i-20] != "Away" & data$Season[i] == data$Season[i-20]& data$team_id[i]==data$team_id[i-20]){
       avg = avg + var2[i-20]
       j = 19
       while(j > 0){
@@ -860,12 +976,6 @@ cleaned$avg20giveaways = last20avg.func(cleaned, cleaned$away_giveaways, cleaned
 cleaned$avg20takeaways = last20avg.func(cleaned, cleaned$away_takeaways, cleaned$home_takeaways)
 cleaned$avg20oppGiveaway = last20avg.func(cleaned, cleaned$home_giveaways, cleaned$away_giveaways)
 cleaned$avg20oppTakeaway = last20avg.func(cleaned, cleaned$home_takeaways, cleaned$away_takeaways)
-#create a table showing first goal win percentage between all the teams
-
-#create a table with Team Name, % of time they score first, % of time FGW, %score1|%FWG
-
-#pairs all of the data
-
 
 write.csv(season2010, file = 'nhl-game-data/2010season.csv')
 write.csv(season2011, file = 'nhl-game-data/2011season.csv')
