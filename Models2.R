@@ -55,6 +55,8 @@ dif20 = finalclean.func(dif20)
 train.dif = sample(1:dim(dif20)[1], dim(dif20)[1]/3*2)
 traindif = dif20[train.dif,]
 testdif = dif20[-train.dif,]
+traincnn = dif20[train.dif,]
+testcnn = dif20[-train.dif,]
 
 difference = dif20[,73:142]
 difference$first_goal_win = dif20$first_goal_win
@@ -75,8 +77,12 @@ train.5 = sample(1:dim(singleline5)[1], dim(singleline5)[1]/100*75)
 train5 = singleline5[train.5,]
 test5 = singleline5[-train.5,]
 
+write.csv(singleline20, file = 'nhl-game-data/bothteams.csv')
+write.csv(dif20, file = 'nhl-game-data/awaydif.csv')
+write.csv(difference, file = 'nhl-game-data/difonly.csv')
+
 #All tasks with avg20 stats
-traindif = makeClassifTask(data = train, target = "first_goal_win", positive = "1")
+traindif = makeClassifTask(data = traindif, target = "first_goal_win", positive = "1")
 testdif = makeClassifTask(data = testdif, target = "first_goal_win", positive = "1")
 
 traindif = normalizeFeatures(traindif,method = "standardize")
@@ -246,60 +252,6 @@ xgmodel = mlr::train(xg_new, traindif)
 predict.xg = predict(xgmodel, testdif)
 xgb20 = confusionMatrix(predict.xg$data$response, testdif$env$data$first_goal_win)
 
-#CNN
-X_train <- traindif %>% 
-  select(-first_goal_win) %>% 
-  scale()
-
-y_train <- to_categorical(traindif$first_goal_win)
-
-X_test <- testdif %>% 
-  select(-first_goal_win) %>% 
-  scale()
-
-y_test <- to_categorical(testdif$first_goal_win)
-
-model <- keras_model_sequential() 
-
-model %>% 
-  layer_dense(units = 256, activation = 'relu', input_shape = ncol(X_train)) %>% 
-  layer_dropout(rate = 0.4) %>% 
-  layer_dense(units = 128, activation = 'relu') %>%
-  layer_dropout(rate = 0.3) %>%
-  layer_dense(units = 2, activation = 'sigmoid')
-
-history <- model %>% compile(
-  loss = 'binary_crossentropy',
-  optimizer = 'adam',
-  metrics = c('accuracy')
-)
-
-model %>% fit(
-  X_train, y_train, 
-  epochs = 100, 
-  batch_size = 5,
-  validation_split = 0.3
-)
-
-summary(model)
-
-model %>% evaluate(X_test, y_test)
-
-
-plot(history$metrics$loss, main="Model Loss", xlab = "epoch", ylab="loss", col="orange", type="l")
-lines(history$metrics$val_loss, col="skyblue")
-legend("topright", c("Training","Testing"), col=c("orange", "skyblue"), lty=c(1,1))
-
-
-plot(history$metrics$acc, main="Model Accuracy", xlab = "epoch", ylab="accuracy", col="orange", type="l")
-lines(history$metrics$val_acc, col="skyblue")
-legend("topleft", c("Training","Testing"), col=c("orange", "skyblue"), lty=c(1,1))
-
-predictions <- model %>% predict_classes(X_test)
-
-confusionMatrix()
-
-
 ##repeat for 10 game variables
 traindif1 = makeClassifTask(data = traindif1, target = "first_goal_win", positive = "1")
 testdif1 = makeClassifTask(data = testdif1, target = "first_goal_win", positive = "1")
@@ -468,30 +420,30 @@ predict.xg = predict(xgmodel, testdif1)
 xgb10=confusionMatrix(predict.xg$data$response, testdif1$env$data$first_goal_win)
 
 ##repeat for 5 game variables
-train5 = makeClassifTask(data = train5, target = "first_goal_win", positive = "1")
-test5 = makeClassifTask(data = test5, target = "first_goal_win", positive = "1")
+train20 = makeClassifTask(data = train20, target = "first_goal_win", positive = "1")
+test20 = makeClassifTask(data = test20, target = "first_goal_win", positive = "1")
 
-train5 = normalizeFeatures(train5,method = "standardize")
-test5 = normalizeFeatures(test5,method = "standardize")
+train20 = normalizeFeatures(train20,method = "standardize")
+test20 = normalizeFeatures(test20,method = "standardize")
 
 library(FSelector)
-important = generateFilterValuesData(train5, method = "information.gain")
+important = generateFilterValuesData(train20, method = "information.gain")
 plotFilterValues(important, n.show = 100)
 
 
 #QDA
 qda.learner = makeLearner("classif.qda", predict.type = "response")
-qda.model = mlr::train(qda.learner, train5)
-qda.predict = predict(qda.model, test5)
-QDA5 = confusionMatrix(qda.predict$data$response, test5$env$data$first_goal_win)
+qda.model = mlr::train(qda.learner, train20)
+qda.predict = predict(qda.model, test20)
+QDA5 = confusionMatrix(qda.predict$data$response, test20$env$data$first_goal_win)
 
 #Logistic Regression
 logistic.learner = makeLearner("classif.logreg",predict.type = "response")
-cv.logistic = crossval(learner = logistic.learner,task = train5,iters = 5,stratify = TRUE,measures = acc,show.info = T)
-logit.mod = mlr::train(logistic.learner, train5)
+cv.logistic = crossval(learner = logistic.learner,task = train20,iters = 5,stratify = TRUE,measures = acc,show.info = T)
+logit.mod = mlr::train(logistic.learner, train20)
 getLearnerModel(logit.mod)
-logit.pred = predict(logit.mod, test5)
-logit5 = confusionMatrix(logit.pred$data$response, test5$env$data$first_goal_win)
+logit.pred = predict(logit.mod, test20)
+logit5 = confusionMatrix(logit.pred$data$response, test20$env$data$first_goal_win)
 
 #Decision Tree
 library(rpart)
@@ -503,13 +455,13 @@ tree.param = makeParamSet(
   makeIntegerParam("minbucket", lower = 5, upper = 50),
   makeNumericParam("cp", lower = 0.001, upper = 0.2))
 gscontrol = makeTuneControlGrid()
-tuned = tuneParams(learner = tree, resampling = set_cv, task = train5, par.set = tree.param, control = gscontrol, measures = acc)
+tuned = tuneParams(learner = tree, resampling = set_cv, task = train20, par.set = tree.param, control = gscontrol, measures = acc)
 tree.param = setHyperPars(tree, par.vals = tuned$x)
-tree.full = mlr::train(tree.param, train5)
+tree.full = mlr::train(tree.param, train20)
 getLearnerModel(tree.full)
-dtfull.pred = predict(tree.full, test5)
+dtfull.pred = predict(tree.full, test20)
 
-decisionT5=confusionMatrix(dtfull.pred$data$response, test5$env$data$first_goal_win)
+decisionT5=confusionMatrix(dtfull.pred$data$response, test20$env$data$first_goal_win)
 #Random Forest
 getParamSet("classif.randomForest")
 
@@ -523,15 +475,15 @@ rf_param = makeParamSet(
 )
 randcontrol= makeTuneControlRandom(maxit = 50L)
 set.cv = makeResampleDesc("CV", iters = 3L)
-rf.tuned = tuneParams(learner = forestLearner, resampling = set.cv, task = train5, par.set = rf_param, control = randcontrol, measures = acc)
+rf.tuned = tuneParams(learner = forestLearner, resampling = set.cv, task = train20, par.set = rf_param, control = randcontrol, measures = acc)
 
 rf.tree = setHyperPars(forestLearner, par.vals = rf.tuned$x)
-rf.trained = mlr::train(rf.tree, train5)
+rf.trained = mlr::train(rf.tree, train20)
 
 getLearnerModel(rf.trained)
 
-rf.pred = predict(rf.trained, test5)
-randfor5=confusionMatrix(rf.pred$data$response, test5$env$data$first_goal_win)
+rf.pred = predict(rf.trained, test20)
+randfor5=confusionMatrix(rf.pred$data$response, test20$env$data$first_goal_win)
 
 #load svm
 svm = makeLearner("classif.ksvm", predict.type = "response")
@@ -546,17 +498,17 @@ param.svm = makeParamSet(
 control = makeTuneControlGrid()
 
 #tune model
-svm.tuned = tuneParams(svm, task = train5, resampling = set.cv, par.set = param.svm, control = control,measures = acc)
+svm.tuned = tuneParams(svm, task = train20, resampling = set.cv, par.set = param.svm, control = control,measures = acc)
 
 #set the model with best params
 set.svm = setHyperPars(svm, par.vals = svm.tuned$x)
 
 #train
-trained.svm = mlr::train(svm, train5)
+trained.svm = mlr::train(svm, train20)
 
 #test
-svm.pred = predict(trained.svm, test5)
-svm5 = confusionMatrix(svm.pred$data$response, test5$env$data$first_goal_win)
+svm.pred = predict(trained.svm, test20)
+svm5 = confusionMatrix(svm.pred$data$response, test20$env$data$first_goal_win)
 
 
 #gbm
@@ -578,17 +530,17 @@ gbm_par= makeParamSet(
 )
 
 #tune parameters
-tune_gbm = tuneParams(learner = g.gbm, task = train5,resampling = set_cv,measures = acc,par.set = gbm_par,control = rancontrol)
+tune_gbm = tuneParams(learner = g.gbm, task = train20,resampling = set_cv,measures = acc,par.set = gbm_par,control = rancontrol)
 
 #set parameters
 final_gbm = setHyperPars(learner = g.gbm, par.vals = tune_gbm$x)
 
 #train
-to.gbm = mlr::train(final_gbm, train5)
+to.gbm = mlr::train(final_gbm, train20)
 
 #test
-pr.gbm = predict(to.gbm, test5)
-gbm5=confusionMatrix(pr.gbm$data$response, test5$env$data$first_goal_win)
+pr.gbm = predict(to.gbm, test20)
+gbm5=confusionMatrix(pr.gbm$data$response, test20$env$data$first_goal_win)
 
 #XGBoost
 
@@ -622,17 +574,17 @@ rancontrol = makeTuneControlRandom(maxit = 100L) #do 100 iterations
 set_cv = makeResampleDesc("CV",iters = 3L)
 
 #tune parameters
-xg_tune = tuneParams(learner = xg_set, task = train5, resampling = set_cv,measures = acc,par.set = xg_ps, control = rancontrol)
+xg_tune = tuneParams(learner = xg_set, task = train20, resampling = set_cv,measures = acc,par.set = xg_ps, control = rancontrol)
 
 #set parameters
 xg_new = setHyperPars(learner = xg_set, par.vals = xg_tune$x)
 
 #train model
-xgmodel = mlr::train(xg_new, train5)
+xgmodel = mlr::train(xg_new, train20)
 
 #test model
-predict.xg = predict(xgmodel, test5)
-xgb5=confusionMatrix(predict.xg$data$response, test5$env$data$first_goal_win)
+predict.xg = predict(xgmodel, test20)
+xgb5=confusionMatrix(predict.xg$data$response, test20$env$data$first_goal_win)
 
 
 xgb20
