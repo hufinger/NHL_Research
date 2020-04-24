@@ -15,28 +15,6 @@ library(scales)
 #Load cleaned data from Variable_Addition.R
 nhl.clean=read.csv('nhl-game-data/cleaned_NHL.csv')
 
-#Summarize Betting Variablity by Team
-season.fgw=nhl.clean %>%
-  group_by(Season) %>%
-  summarize(rate=mean(first_goal_win)) %>%
-  mutate(Season=Season %/% 10000) %>%
-  cbind(Team="All") %>%
-  rename(`First Goal Wins`=rate)
-
-
-for(i in unique(nhl.clean$team_id)){
-  data=filter(nhl.clean,team_id==i) %>%
-          select(Season,away_team_id,home_team_id, first_goal_win) %>%
-          group_by(Season) %>%
-          summarize(rate=mean(first_goal_win)) %>%
-          cbind(as.character(i)) %>%
-          mutate(Season=Season %/% 10000) %>%
-          rename(`First Goal Wins`=rate,Team="as.character(i)")
-  season.fgw=rbind(season.fgw,data)
-}
-
-
-
 for(i in 1:nrow(nhl.clean)){
   if(nhl.clean$team_id[i] == 52){
     nhl.clean$team_id[i] = 31
@@ -72,6 +50,27 @@ for(i in 1:nrow(nhl.clean)){
   }
 }
 
+#Summarize Betting Variablity by Team
+season.fgw=nhl.clean %>%
+  group_by(Season) %>%
+  summarize(rate=mean(first_goal_win)) %>%
+  mutate(Season=Season %/% 10000) %>%
+  cbind(Team="All") %>%
+  rename(`First Goal Wins`=rate)
+
+season.fgw1 = season.fgw
+
+for(i in unique(nhl.clean$team_id)){
+  data=filter(nhl.clean,team_id==i) %>%
+          select(Season,away_team_id,home_team_id, first_goal_win) %>%
+          group_by(Season) %>%
+          summarize(rate=mean(first_goal_win)) %>%
+          cbind(as.character(i)) %>%
+          mutate(Season=Season %/% 10000) %>%
+          rename(`First Goal Wins`=rate,Team="as.character(i)")
+  season.fgw=rbind(season.fgw,data)
+}
+
 #Summarize Betting Variable by H vs A
 nhl.clean %>%
   select(away_team_id,home_team_id,first_goal_win) %>%
@@ -84,7 +83,8 @@ HA.tile = nhl.clean %>%
   group_by(away_team_id,home_team_id) %>%
   summarize(rate=mean(first_goal_win))
 
-ggplot(HA.tile, aes(away_team_id, home_team_id)) + geom_tile(aes(fill = rate))
+ggplot(HA.tile, aes(away_team_id, home_team_id)) + geom_tile(aes(fill = rate))+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank())+xlab("Away Team ID") + ylab("Home Team ID")+
+  labs(title = "First Goal Win Rate by H vs A Matchup")
 
 #Summarize Betting Variable with no Regard for H vs A
 
@@ -93,7 +93,8 @@ total.tile = nhl.clean %>%
   group_by(team_id, other.id) %>%
   summarize(rate=mean(first_goal_win))
 
-ggplot(total.tile, aes(team_id, other.id)) + geom_tile(aes(fill = rate))
+ggplot(total.tile, aes(team_id, other.id)) + geom_tile(aes(fill = rate))+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank())+xlab("Away Team ID") + ylab("Home Team ID")+
+  labs(title = "First Goal Win Rate by Matchup")
 
 #Average FGW over the course of the dataset
 
@@ -178,9 +179,8 @@ tileplotclose.func(Northwest3)
 tileplotclose.func(Pacific3)
 tileplotclose.func(Southeast3)
 
-count = nhl.clean %>%
-    select(team_id, other.id) %>%
-    count(team_id, other.id)
+ggplot(season.fgw) + geom_line(aes(Season, season.fgw[,2], color = Team)) + geom_hline(yintercept = target, colour = "red")+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank())+ ylab("First Goal Wins Percentage")+
+  labs(title = "First Goal Wins by Season by Team")
 
-MOE.data = left_join(total.tile, count) %>%
-    mutate(ME = 1.96*sqrt(rate/n), upper = rate+ME, lower = rate - ME)
+ggplot(season.fgw1) + geom_line(aes(Season, season.fgw1[,2])) + geom_hline(yintercept = target, colour = "red")+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank())+ ylab("First Goal Wins Percentage")+
+  labs(title = "First Goal Wins by Season")

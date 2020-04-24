@@ -587,27 +587,31 @@ predict.xg = predict(xgmodel, test20)
 xgb5=confusionMatrix(predict.xg$data$response, test20$env$data$first_goal_win)
 
 
-xgb20
-svm20
-randfor20
 QDA20
-logit20
-decisionT20
-gbm20
-
-xgb10
-svm10
-randfor10
 QDA10
-logit10
-decisionT10
-gbm10
-
-xgb5
-svm5
-randfor5
 QDA5
+
+logit20
+logit10
 logit5
+
+decisionT20
+decisionT10
 decisionT5
+
+randfor20
+randfor10
+randfor5
+
+svm20
+svm10
+svm5
+
+gbm20
+gbm10
 gbm5
+
+xgb20
+xgb10
+xgb5
 
